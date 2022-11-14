@@ -1,0 +1,393 @@
+---
+title: "ASA Individual assignment"
+author: "Jhanvi Sharma"
+date: "2022-11-12"
+output:
+  html_document: default
+  pdf_document: default
+  
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+Installing all the necessary packages for the individual assignment
+
+
+```{r cars}
+library(DiscriMiner)
+library(caret)
+library(MASS)
+library(klaR)
+library(MVN)
+library(readxl)
+library(MASS)
+library(aod)
+library(corrplot)
+library(lmtest)
+library(tidyverse)
+```
+
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r,echo=TRUE}
+data <- read_excel("C:/Users/22jha/OneDrive/Desktop/ASA final assignment.xlsx")
+names(data)
+
+```
+
+## Checking correlation between columns
+
+
+
+```{r,echo=TRUE}
+
+corrplot(cor(data),
+         method = "number",
+         type = "upper")
+
+```
+
+
+```{r,echo=TRUE}
+par(mfrow=c(1,1))
+hist(data$Age, col ="green", border ="black", prob = TRUE, xlab = "Age", main = "Plot of Age")
+
+
+hist(data$Income,col="green", border="black", prob = TRUE, xlab = "Income", main = "Plot of Income")
+
+hist(data$CCAvg, col="green", border="black", prob = TRUE, xlab = "CCAvg", main = "CCAvg Plot")
+
+
+hist(data$Mortgage, col="green", border="black",prob = TRUE, xlab = "Mortgage", main = "Mortgage Plot")
+
+
+```
+
+```{r,echo=TRUE}
+
+data <- read_excel("C:/Users/22jha/OneDrive/Desktop/ASA final assignment.xlsx")
+data<-data.frame(data)
+
+par(mfrow=c(2,2))
+
+# a) In this we arnt transforming age column
+
+hist(data$Age, col="green", border="black", prob = TRUE, xlab = "Age", main = "Plot of Age")
+
+# b) We are taking square root of Income variable in order to transform the variable 
+
+# For Income -  
+data$Income=(data$Income)^(1/2)
+
+hist(data$Income, col="green", border="black", prob = TRUE, xlab = "Income", main = "Plot of Income")
+
+
+# c)We are taking log of Income variable in order to transform the variable 
+
+# the non-zero CCAvg values.
+data$CCAvg[data$CCAvg!=0]=log(data$CCAvg[data$CCAvg!=0])
+
+hist(data$CCAvg[data$CCAvg!=0], col="green", border="black", prob = TRUE, xlab = "CCAvg", main = "CCAvg Plot")
+
+
+# d) In order to do the transformation of Mortgage column, We are taking log of 
+# the non-zero Mortgage values.
+data$Mortgage[data$Mortgage!=0]=log(data$Mortgage[data$Mortgage!=0])
+
+hist(data$Mortgage[data$Mortgage!=0], col="green",border="black", prob = TRUE, xlab = "Mortgage", main = "Mortgage Plot")
+
+
+```
+
+### Following section will be about the Discriminant Analysis
+### Question 1 - Build a Discriminant Analysis Model to predict whether the person is likely to
+### accept the bank’s offer for a personal loan. If necessary, create new variables to
+### improve the model performance.
+
+```{r,echo=TRUE}
+
+ASAdata <- data.frame(data)
+names(ASAdata)
+str(ASAdata)
+nrow(ASAdata)
+
+# Let's divide the dataset into 70% training and 30% test set.
+
+
+train_size<-floor(nrow(ASAdata)*0.7)
+set.seed(213)
+
+# Random Sampling - 
+randsamp <- sample(seq_len(nrow(ASAdata)), size = train_size)
+
+# Training data set
+
+trnds <- ASAdata[randsamp,]
+
+
+# Test data set
+
+test <- ASAdata[-randsamp,]
+nrow(trnds)
+nrow(test)
+
+
+# Applying LDA
+
+LDAset <- lda(Personal.Loan ~ Age + Income  + Family + CCAvg  + Education + Mortgage + Securities.Account + CD.Account + Online+ CreditCard,
+            data=ASAdata,subset=randsamp)
+LDAset
+```
+## 92.71% people not opting loan data
+##7.28% opting for loan as per train set
+### 45.60 of Average age of people are not applying for loan , whereas 44.9 are opting for loan
+### 7.95 is the Average Income of people not applying for loan, whereas 11.88 is for people applying for loan
+### According to the coefficient analysis, People having higher chances of taking a loan are People having negligible securities in account, People whose online transactions is less,and those who have less Credit Card transactions or have no credit card.
+
+### Z= 0.0004*Age + 0.333*Income + 0.187*Family +0.066*CCAvg + 0.442*Education + 0.027*Mortgage - 0.668*Securities.Account + 3.015*CD.Account - 0.269*Online -0.436*CreditCard
+
+```{r,echo=TRUE}
+plot(LDAset,type='b')
+
+```
+
+
+```{r,echo=TRUE}
+
+ldatrain <- predict(LDAset, trnds)
+ldatrain <- as.data.frame(ldatrain)
+table(ldatrain$class, trnds$Personal.Loan)
+head(ldatrain)
+Tactrain<- (639+27)/(639+27+10+24)
+Tactrain
+```
+###Total Accuracy of the training data set can be seen as 95.1%
+
+```{r,echo=TRUE}
+# The prediction can now be tested on the test set - 
+
+ldatest <- predict(LDAset, test)
+table(ldatest$class, test$Personal.Loan)
+Tactest<- (258+26)/(258+26+5+11)
+Tactest
+```
+###Total Accuracy of the test set can be seen as 94.6%
+
+```{r,echo=TRUE}
+## Q2 Carry out significance tests using Wilk’s Lambda
+
+form = Personal.Loan ~ Age + Income  + Family + CCAvg  + Education + Mortgage + Securities.Account + CD.Account + Online+ CreditCard
+greedy.wilks(form, data=ASAdata, niveau = 0.10)
+
+```
+## Q3. Comment on the variables that are significant
+
+As per the Wilk's lambda test: Income, Education,CD Account, Family, CreditCard and Securities.Account are the significant independent variables as the P values of these variables are significantly low.
+
+## Q4. Create the confusion matrix and comment on the prediction accuracy.
+```{r,echo=TRUE}
+ 
+
+table(ldatest$class, test$Personal.Loan)
+Tacctest<- (258+11)/(258+11+5+26)
+Tacctest
+```
+###The Accuracy of the confusion matrix can be seen as 89.67%
+
+```{r,echo=TRUE}
+
+data_x<-ASAdata[,c(-4,-9)]
+data_y<-ASAdata[,9]
+LDAobs<-linDA(data_x,data_y)
+LDAobs$confusion
+
+
+LDApropen <- exp(LDAobs$scores[,2])/(exp(LDAobs$scores[,1])+exp(LDAobs$scores[,2]))
+
+ASAdata['Propensity']=LDApropen
+
+Top_30_Loan<-head(ASAdata[order(-ASAdata$Propensity),],30)
+
+Top_30_Loan
+```
+
+
+### Section 2 - Logistic Regression
+
+```{r,echo=TRUE}
+
+data <- read_excel("C:/Users/22jha/OneDrive/Desktop/ASA final assignment.xlsx")
+
+
+
+```
+## Q1 Build a logistic regression equation to predict whether the person is likely to accept
+## the bank’s offer for a personal loan. If necessary, create new variables to improve
+## the model performance.
+
+###We are taking square root of the Income to do the transformation of Income column Income column
+```{r,echo=TRUE}
+
+data$Income=(data$Income)^(1/2)
+```
+
+###We are taking log of the non-zero CCAvg values to do the transformation of CCAvg column.
+```{r,echo=TRUE}
+data$CCAvg[data$CCAvg!=0]=log(data$CCAvg[data$CCAvg!=0])
+```
+###We are taking log of the non-zero Mortgage values to do the transformation of Mortgage column.
+
+```{r,echo=TRUE}
+
+data$Mortgage[data$Mortgage!=0]=log(data$Mortgage[data$Mortgage!=0])
+ASAdataLR <- data.frame(data)
+
+### Removing the zip code column
+ASAdataLR<-ASAdataLR[-4]
+```
+
+###Treat Education as categorical (R will create dummy variables)
+
+```{r,echo=TRUE}
+
+ASAdataLR$Education <- factor(ASAdataLR$Education, levels = c(1, 2, 3), labels = c("Undergrad", "Graduate", "Advanced/Professional"))
+```
+
+
+```{r,echo=TRUE}
+
+trainlr<-floor(nrow(ASAdataLR)*0.7)
+set.seed(214)
+```
+
+
+```{r,echo=TRUE}
+
+train_samplelr <- sample(seq_len(nrow(ASAdataLR)),
+                               size = trainlr)
+```
+
+
+```{r,echo=TRUE}
+
+trainlr <- ASAdataLR[train_samplelr,]
+nrow(trainlr)
+```
+```{r,echo=TRUE}
+
+testlr <- ASAdataLR[-train_samplelr,]
+nrow(testlr)
+```
+
+###Logistic regression on the training set of 700 observations --
+
+```{r,echo=TRUE}
+
+logireg<-glm(Personal.Loan ~ Age + Income  + Family + CCAvg  + Education + Mortgage + Securities.Account + CD.Account + Online+ CreditCard,
+               data = trainlr, family = "binomial")
+summary(logireg)
+```
+###Running confusion matrix for training data set--
+```{r,echo=TRUE}
+
+logipred <- predict(logireg, trainlr ,type = "response")
+LR_pred <- as.numeric(logipred>0.5)
+confusionMatrix(table(LR_pred,trainlr$Personal.Loan),positive = '1')
+```
+###Analysis of prediction model on logistic regression - 
+
+###Accuracy : 9629%         
+###95% CI : (0.946, 0.9756)
+###No Information Rate : 0.9114         
+###P-Value [Acc > NIR] : 7.209e-08
+
+
+###Running model on test data of 300 observations --
+```{r,echo=TRUE}
+
+LRtestpred <- predict(logireg, testlr ,type = "response")
+LR_pre <- as.numeric(LRtestpred>0.5)
+confusionMatrix(table(LR_pre,testlr$Personal.Loan),positive = '1')
+```
+###Analysis of confusion matrix on test data - 
+
+###LR_pre   0   1
+###     0 266  13
+###     1   8  13
+                                         
+###Accuracy : 93%           
+###95% CI : (0.895, 0.9561)
+###No Information Rate : 0.9133         
+###P-Value [Acc > NIR] : 0.1788 
+
+
+##Q2. Carry out the omnibus test to test whether the model as a whole is significant. Comment on the result of the omnibus test.
+```{r,echo=TRUE}
+lrtest(logireg)
+```
+###According to Likelihood ratio test, there are 2 models being tested - 1 without any Independent variable and 1 with independent variables
+
+###This is a chi-square test with degrees of freedom equal to the number of independent variables
+###We observe the log-likelihood without any independent variable of base model is -209.454 and log likelihood for a model having necessary independent variables is -70.179
+
+###The chi-square is the difference between (-2*BaseModel)- (-2*Model with Independent variables)
+
+###When we multiply bith the log likelihood then we get the values = 418.908 and 140.358
+###This is evident that -2 log-likelihood has decreased from418.908 to 140.358 for base model and the one with independent variables. This difference in values between base model and model with independent variables is attributed to the predictive capability of independent variables.
+
+###We can observe the actual improvement in likelihood is (418.908-140.358)= 278.55
+
+###Hence we can assure that the Omnibus test is significant.
+
+##Q4. Carry out the hypothesis test that the model fits the data. Comment on the results.
+```{r,echo=TRUE}
+
+for (i in 1:12){
+  WaldOpa<-wald.test(b=coef(logireg),Sigma = vcov(logireg),Terms = 1:i)
+  print(WaldOpa)
+}
+```
+###With the Wald's test we can observe the  maximum chi-square value as 82.6 and its p-value is the least.
+```{r,echo=TRUE}
+summary(logireg)
+```
+###At 90% CI, Intercept, Income, Family, CCAvg, EducationGraduate, EducationAdvanced/Professional, CD.Account and online are the most significant variables, based on the p-value less than 0.10
+
+
+
+## Q5. The bank would like to address the top 30 persons with an offer for personal loanbased on the probability (propensity). Create a table displaying all the details of the “top” 30 persons who are most likely to accept the bank’s offer. Make sure to include the probability of accepting the offer along with all the other details.
+```{r,echo=TRUE}
+
+
+logicomplete<-glm(Personal.Loan ~ Age + Income  + Family + CCAvg  + Education + Mortgage + Securities.Account + CD.Account + Online+ CreditCard,
+                        data = ASAdataLR, family = "binomial")
+
+LR_prop<-predict(logicomplete, type = "response")
+
+ASAdataLR['Propensity']=LR_prop
+Top30LoanLR<-head(ASAdataLR[order(-ASAdataLR$Propensity),],30)
+Top30LoanLR
+```
+
+
+## 6. Compare the above list of 30 persons against the 30 persons obtained from Discriminant Analysis (part 1). Comment on the similarities and dissimilarities.
+
+```{r,echo=TRUE}
+
+Index<-as.character(rownames(Top30LoanLR))
+Top30LoanLR[Index,]
+Top_30_Loan[Index,]
+Top30LoanLR$results = ifelse(Top30LoanLR[Index,]$Personal.Loan == Top_30_Loan[Index,]$Personal.Loan, "True","False")
+Top30LoanLR %>% filter(results== "True")
+
+```
+###We can observe from the output that 22 people are showing same in both the analysis and 8 of them show different in both.
